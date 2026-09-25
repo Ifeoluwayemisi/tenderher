@@ -1,4 +1,10 @@
-export type ViewMode = 'profile' | 'opportunities' | 'intelligence' | 'readiness';
+export type ViewMode =
+  | 'profile'
+  | 'opportunities'
+  | 'intelligence'
+  | 'evidence'
+  | 'readiness'
+  | 'settings';
 
 export interface BusinessProfileData {
   industry: string;
@@ -11,13 +17,20 @@ export interface BusinessProfileData {
   companyName: string;
   userName: string;
   email: string;
+  cacNumber?: string;
+  tinNumber?: string;
+  phoneNumber?: string;
 }
 
 export type RequirementStatus = 'MATCH' | 'POTENTIAL GAP' | 'UNKNOWN';
 
 export interface RequirementItem {
   id: string;
-  category: 'FINANCIAL CAPACITY' | 'TECHNICAL & OPERATIONAL' | 'STATUTORY & LEGAL' | 'ADMINISTRATIVE';
+  category:
+    | 'FINANCIAL CAPACITY'
+    | 'TECHNICAL & OPERATIONAL'
+    | 'STATUTORY & LEGAL'
+    | 'ADMINISTRATIVE';
   title: string;
   status: RequirementStatus;
   userProfileText: string;

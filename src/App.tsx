@@ -6,8 +6,12 @@ import { Header } from './components/Header';
 import { BusinessProfile } from './components/BusinessProfile';
 import { Opportunities } from './components/Opportunities';
 import { TenderIntelligence } from './components/TenderIntelligence';
+import { EvidenceView } from './components/EvidenceView';
+import { BidReadinessView } from './components/BidReadinessView';
+import { SettingsView } from './components/SettingsView';
 import { EvidenceDrawer } from './components/EvidenceDrawer';
-import { BidReadiness } from './components/BidReadiness';
+import { GazetteModal } from './components/GazetteModal';
+import { UploadModal } from './components/UploadModal';
 import type { ToastMessage } from './components/Toast';
 import { ToastContainer } from './components/Toast';
 
@@ -15,14 +19,23 @@ export function App() {
   const [currentView, setCurrentView] = useState<ViewMode>('profile');
   const [profile, setProfile] = useState<BusinessProfileData>(initialProfileData);
   const [opportunities, setOpportunities] = useState<Opportunity[]>(opportunitiesData);
-  const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(
+  const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity>(
     opportunitiesData[0]
   );
   const [selectedEvidenceItem, setSelectedEvidenceItem] = useState<RequirementItem | null>(null);
+
+  // Modals state
+  const [isGazetteOpen, setIsGazetteOpen] = useState(false);
+  const [uploadDocName, setUploadDocName] = useState<string | null>(null);
+
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // Add toast helper
-  const addToast = (title: string, description?: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const addToast = (
+    title: string,
+    description?: string,
+    type: 'success' | 'error' | 'info' = 'success'
+  ) => {
     const id = Date.now().toString();
     setToasts((prev) => [...prev, { id, title, description, type }]);
     setTimeout(() => {
@@ -34,18 +47,18 @@ export function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Recalculate dynamic requirements matching profile state (e.g. if user updates years of experience or turnover)
+  // Recalculate dynamic requirements matching profile state
   const handleUpdateProfile = (updated: Partial<BusinessProfileData>) => {
     const newProfile = { ...profile, ...updated };
     setProfile(newProfile);
 
-    // Update requirements dynamically across opportunities
     const updatedOpps = opportunities.map((opp) => {
       const updatedReqs = opp.requirements.map((req) => {
         if (req.id === 'req-1-2') {
-          const yrs = typeof newProfile.yearsOfExperience === 'number'
-            ? newProfile.yearsOfExperience
-            : parseInt(String(newProfile.yearsOfExperience)) || 4;
+          const yrs =
+            typeof newProfile.yearsOfExperience === 'number'
+              ? newProfile.yearsOfExperience
+              : parseInt(String(newProfile.yearsOfExperience)) || 4;
 
           if (yrs >= 5) {
             return {
@@ -58,7 +71,9 @@ export function App() {
             return {
               ...req,
               status: 'POTENTIAL GAP' as const,
-              userProfileText: `Your profile: ${yrs} years of experience (falls ${5 - yrs} year${5 - yrs > 1 ? 's' : ''} below stated threshold)`,
+              userProfileText: `Your profile: ${yrs} years of experience (falls ${
+                5 - yrs
+              } year${5 - yrs > 1 ? 's' : ''} below stated threshold)`,
               userValue: `${yrs} Years`,
             };
           }
@@ -66,7 +81,6 @@ export function App() {
         return req;
       });
 
-      // Recalculate badge counts
       const matchesCount = updatedReqs.filter((r) => r.status === 'MATCH').length;
       const potentialGapsCount = updatedReqs.filter((r) => r.status === 'POTENTIAL GAP').length;
 
@@ -79,10 +93,8 @@ export function App() {
     });
 
     setOpportunities(updatedOpps);
-    if (selectedOpportunity) {
-      const match = updatedOpps.find((o) => o.id === selectedOpportunity.id);
-      if (match) setSelectedOpportunity(match);
-    }
+    const match = updatedOpps.find((o) => o.id === selectedOpportunity.id);
+    if (match) setSelectedOpportunity(match);
   };
 
   const handleNavigate = (view: ViewMode) => {
@@ -96,46 +108,66 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleOpenEvidence = (item: RequirementItem) => {
+  const handleOpenEvidenceDrawer = (item: RequirementItem) => {
     setSelectedEvidenceItem(item);
+  };
+
+  const handleDocumentUploadSuccess = (docName: string) => {
+    addToast(
+      'Document Verified',
+      `${docName} has been processed and saved to ${profile.companyName}'s compliance vault.`
+    );
   };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-row font-sans text-slate-900 selection:bg-emerald-600 selection:text-white">
-      {/* Left Sidebar (260px) */}
+      {/* Fixed Left Sidebar (w-64) */}
       <Sidebar
         currentView={currentView}
         onNavigate={handleNavigate}
         opportunitiesCount={opportunities.length}
         profile={profile}
-        activeEvidenceStep={Boolean(selectedEvidenceItem)}
       />
 
-      {/* Main Container Right */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+      {/* Main Container Right (pl-64 offset for fixed sidebar) */}
+      <div className="pl-64 flex-1 flex flex-col min-w-0 min-h-screen">
         {/* Top Header */}
         <Header
           currentView={currentView}
-          opportunityTitle={selectedOpportunity?.title}
+          opportunityTitle={selectedOpportunity.title}
           onNavigate={handleNavigate}
+          onNotificationToast={() =>
+            addToast(
+              'Procurement Intelligence Alert',
+              '1 new NITDA ICT tender closing in 5 days matches TechSolutions Ltd profile.'
+            )
+          }
         />
 
         {/* Dynamic Main View Content */}
         <main className="flex-1 pb-16 overflow-y-auto">
+          {/* STEP 1: Business Profile */}
           {currentView === 'profile' && (
             <BusinessProfile
               profile={profile}
               onUpdateProfile={handleUpdateProfile}
               onAnalyze={() => {
-                addToast('Business Profile Analyzed', 'Comparing business profile against 4 active Nigerian procurement opportunities.');
+                addToast(
+                  'Business Profile Analyzed',
+                  'Comparing profile parameters against 4 active Nigerian procurement opportunities.'
+                );
                 handleNavigate('opportunities');
               }}
               onSaveToast={() => {
-                addToast('Profile saved successfully', 'Your changes have been saved to your workspace settings.');
+                addToast(
+                  'Profile Saved Successfully',
+                  'Your enterprise details are stored securely for eligibility checks.'
+                );
               }}
             />
           )}
 
+          {/* STEP 2: Opportunities Directory */}
           {currentView === 'opportunities' && (
             <Opportunities
               opportunities={opportunities}
@@ -143,37 +175,85 @@ export function App() {
             />
           )}
 
-          {currentView === 'intelligence' && selectedOpportunity && (
+          {/* STEP 3: Tender Intelligence */}
+          {currentView === 'intelligence' && (
             <TenderIntelligence
               opportunity={selectedOpportunity}
               onBack={() => handleNavigate('opportunities')}
-              onSelectEvidence={handleOpenEvidence}
+              onSelectEvidence={(item) => {
+                if (item.status === 'POTENTIAL GAP') {
+                  handleNavigate('evidence');
+                } else {
+                  handleOpenEvidenceDrawer(item);
+                }
+              }}
             />
           )}
 
-          {currentView === 'readiness' && (
-            <BidReadiness
+          {/* STEP 4: Evidence Analysis & Deep-Dive */}
+          {currentView === 'evidence' && (
+            <EvidenceView
+              opportunity={selectedOpportunity}
               profile={profile}
-              selectedOpportunity={selectedOpportunity}
-              onNavigateOpportunities={() => handleNavigate('opportunities')}
+              onBackToIntelligence={() => handleNavigate('intelligence')}
+              onProceedBidReadiness={() => {
+                handleNavigate('readiness');
+                addToast(
+                  'Bid Readiness Engine Activated',
+                  'Generating compliance scoring and deficit resolution pathways.'
+                );
+              }}
+              onOpenGazetteModal={() => setIsGazetteOpen(true)}
+            />
+          )}
+
+          {/* STEP 5: Bid Readiness Dashboard */}
+          {currentView === 'readiness' && (
+            <BidReadinessView
+              profile={profile}
+              opportunity={selectedOpportunity}
+              onNavigate={handleNavigate}
+              onViewEvidence={() => handleNavigate('evidence')}
+              onOpenUploadModal={(docName) => setUploadDocName(docName)}
+            />
+          )}
+
+          {/* SETTINGS VIEW */}
+          {currentView === 'settings' && (
+            <SettingsView
+              profile={profile}
+              onUpdateProfile={handleUpdateProfile}
               onToast={(title, desc) => addToast(title, desc)}
             />
           )}
         </main>
       </div>
 
-      {/* Side Slide-Over Drawer Panel ("Why are we saying this?") */}
+      {/* Side Slide-Over Drawer Panel */}
       <EvidenceDrawer
         item={selectedEvidenceItem}
         onClose={() => setSelectedEvidenceItem(null)}
         onProceedBidReadiness={() => {
           setSelectedEvidenceItem(null);
           handleNavigate('readiness');
-          addToast('Bid Readiness Active', 'Reviewing compliance score and statutory requirement dossier.');
         }}
       />
 
-      {/* Toast Notifications Container */}
+      {/* Gazette View Modal */}
+      <GazetteModal
+        isOpen={isGazetteOpen}
+        onClose={() => setIsGazetteOpen(false)}
+        onToast={(title, desc) => addToast(title, desc)}
+      />
+
+      {/* Document Upload Modal */}
+      <UploadModal
+        docName={uploadDocName}
+        onClose={() => setUploadDocName(null)}
+        onSuccess={handleDocumentUploadSuccess}
+      />
+
+      {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
